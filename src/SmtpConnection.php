@@ -6,6 +6,8 @@ class SmtpConnection implements ConnectionInterface
 {
     protected const PORT = 25;
 
+    protected string $checkLog = '';
+
     /**
      * @param $mx_address
      *
@@ -26,6 +28,13 @@ class SmtpConnection implements ConnectionInterface
         return fgets($sock,1024) ?: '';
     }
 
+    /**
+     * @param string $mx_address
+     * @param string $from_address
+     * @param string $to_address
+     *
+     * @return bool
+     */
     public function isLiveAddress(string $mx_address, string $from_address, string $to_address): bool
     {
         $sock = $this->createSocket($mx_address);
@@ -53,5 +62,13 @@ class SmtpConnection implements ConnectionInterface
 
         fclose($sock);
         return true;
+    }
+
+    /**
+     * @return string
+     */
+    public function getLastCheckLog(): string
+    {
+        return $this->checkLog;
     }
 }
