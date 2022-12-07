@@ -22,6 +22,11 @@ final class Checker
     private string $from_address = '';
 
     /**
+     * @var string
+     */
+    private string $checkLog = '';
+
+    /**
      * @param ConnectionInterface[] $connections
      */
     public function __construct(array $connections = [], string $from_address = '')
@@ -50,26 +55,45 @@ final class Checker
      */
     public function isLiveAddress(string $mail_address): bool
     {
-        $matches = [];
+        $this->checkLog = "Start checking address: {$mail_address}\n";
 
-        if (!preg_match("/^([a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+)@([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*)$/", $mail_address, $matches)) {
-            return false;
-        }
+        $result = (function() use($mail_address) {
+            $matches = [];
 
-        $hostname = $matches[2];
-        $mx_records = MxRecordResolver::resolve($hostname);
-        if (empty($mx_records)) {
-            return false;
-        }
+            if (!preg_match("/^([a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+)@([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*)$/", $mail_address, $matches)) {
+                $this->checkLog .= "address is invalid.\n";
+                return false;
+            }
 
-        foreach ($mx_records as $mx_record) {
-            foreach ($this->connections as $connection) {
-                if ($connection->isLiveAddress($mx_record, $this->from_address, $mail_address)) {
-                    return true;
+            $hostname = $matches[2];
+            $mx_records = MxRecordResolver::resolve($hostname);
+            if (empty($mx_records)) {
+                $this->checkLog .= "Host:{$hostname} MX Record is not found.\n";
+                return false;
+            }
+
+            foreach ($mx_records as $mx_record) {
+                foreach ($this->connections as $connection) {
+                    $result = $connection->isLiveAddress($mx_record, $this->from_address, $mail_address);
+                    $this->checkLog .= $connection->getLastCheckLog();
+                    if ($result) {
+                        return true;
+                    }
                 }
             }
-        }
 
-        return false;
+            return false;
+        })();
+
+        $this->checkLog .= ($result ? "Address `{$mail_address}` is found." : "Address `{$mail_address}` is not found.") . "\n";
+        return $result;
+    }
+
+    /**
+     * @return string
+     */
+    public function getLastCheckLog(): string
+    {
+        return $this->checkLog;
     }
 }
